@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+</head>
+
+<body>
+  <div id="root">
+    <input type="text" id="q" name="q">
+    <button id="myBtn" onclick="window.location = '/search?q=' + document.getElementById('q').value;">Search</button>
+  </div>
+  <script type="text/javascript">
+    var input = document.getElementById("q");
+    input.addEventListener("keyup", function(event) {
+      if (event.keyCode === 13) {
+        event.preventDefault();
+        document.getElementById("myBtn").click();
+      }
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <script src="https://code.jquery.com/jquery-2.1.3.min.js"></script>
+</head>
+
+<body>
+  <div id="heading">
+    <input type="text" id="q" name="q">
+    <button id="myBtn" onclick="window.location = '/search?q=' + document.getElementById('q').value;">Search</button>
+  </div>
+  <div id="root">
+  </div>
+  <script src="search/js"></script>
+  <script type="text/javascript">
+    var input = document.getElementById("q");
+    input.addEventListener("keyup", function(event) {
+      if (event.keyCode === 13) {
+        event.preventDefault();
+        document.getElementById("myBtn").click();
+      }
+    });
+  </script>
+</body>
+
+</html>
