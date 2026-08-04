@@ -21,7 +21,7 @@ const urlSchema = mongoose.Schema({
   FoundAt: Date,
 });
 
-const indexTerm = mongoose.Schema({
+const indexSchema = mongoose.Schema({
   term: {
     type: String,
     index: true,
@@ -34,9 +34,21 @@ const indexTerm = mongoose.Schema({
   }]
 });
 
+const hostSchema = mongoose.Schema({
+  host: {
+    type: String, 
+    index: true,
+    unique: true
+  },
+  robotsTxt: String,
+  fetchedAt: Date,
+  nextAllowedAt: Date,
+});
+
 module.exports = {
   Entry: mongoose.model('entries', validEntrySchema),
   InvalidEntry: mongoose.model('invalidEntries', invalidEntrySchema),
   Url: mongoose.model('urls', urlSchema),
-  IndexTerm: mongoose.model('index', indexTerm),
+  IndexTerm: mongoose.model('index', indexSchema),
+  Host: mongoose.model('hosts', hostSchema),
 };

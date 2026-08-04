@@ -64,42 +64,46 @@ async function processURL(res, url) {
   }
 }
 
-function callUrlBackup(url) {
-  return axios.get(url, {
-    timeout: 5000
-  }).then((res) => {
-    if (checkRes(res)) {
-      return processURL(res, url);
-    }
-  }).catch((err) => {
-    console.error(err);
-    console.log(`Unable to call ${url}`);
-  });
-}
-
-function callUrl(url) {
-  return axios({
-    method: "get",
-    url: url
-  }).then((res) => {
-    if (checkRes(res)) {
-      return processURL(res, url);
-    }
-  }).catch((err) => {
-    console.log(`Unable to call ${url}, trying again`);
-    return callUrlBackup(url);
-  });
-}
-
 function nextQueue(url, _pid = 0) {
+  let { host, origin } = new URL(url);
+  const now = new Date();
   console.log("URL being processed: " + url);
-  return new Promise(async function(resolve) {
-    await sleep(1000);
-    pid = _pid;
-    await callUrl(url);
-    await convert(url, _pid);
-    resolve();
-  });
+  return sleep(1000)
+    .then(async () => {
+      await models.Host.updateOne(
+        { host },
+        { $setOnInsert: { nextAllowedAt: new Date(0) } },
+        { upsert: true }
+      );
+      let claim = await models.Host.findOneAndUpdate(
+        { host, nextAllowedAt: { $lte: now } },
+        { $set: { nextAllowedAt: new Date(now.getTime() + 5000), fetchedAt: now } },
+        { new: true }
+      )
+      if (!claim) return;
+      pid = _pid;
+      if (!claim.robotsTxt) {
+        await axios.get(`${origin}/robots.txt`)
+          .then((res) => res.data)
+          .then((robotsTxt) => models.Host.updateOne(
+            { host },
+            { robotsTxt },
+            { upsert: true }
+          ))
+          .catch((err) => {
+            if (err?.response?.status !== 404) {
+              throw err;
+            }
+          })
+      }
+      let res = await axios.get(url);
+      await convert(res, url, claim, _pid);
+      await processURL(res, url);
+    })
+    .catch((err) => {
+      console.error("URL: " + url + " failed");
+      return sleep(1000);
+    })
 }
 
 module.exports = nextQueue;

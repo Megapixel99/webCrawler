@@ -93,12 +93,5 @@ async function masterProcess() {
 async function childProcess() {
     require('./databaseConnect.js').connect();
     await search(process.env.URL, process.pid);
-    await models.Url.deleteMany({ Url: process.env.URL }, function(err) {
-        if (!err) {
-            console.log("Removed URL: " + process.env.URL + " from queue");
-        } else {
-            console.log("Unable to remove URL: " + process.env.URL + " from queue");
-        }
-    });
     process.exit(0);
 }

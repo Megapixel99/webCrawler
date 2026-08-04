@@ -85,50 +85,37 @@ function checkRes(res) {
         return false;
 }
 
-async function findRecords(url, pid = 0) {
-  console.log("URL being converted: " + url);
-  return axios.get(url).then(async function(res) {
-    if (checkRes(res)) {
-      let dom = new JSDOM(res.data).window.document;
-      let meta = getMeta(dom);
-      let archive = true;
-      if (meta.robots !== undefined && meta.robots !== null) {
-        if (meta.robots.toLowerCase().includes("noindex") || meta.robots.toLowerCase().includes("none")) {
-          return;
-        }
-        archive = meta.robots.toLowerCase().includes("noarchive") || meta.robots.toLowerCase().includes("no archive");
+async function findRecords(res, url, claim, pid = 0) {
+  if (!claim) return Promise.resolve();
+  if (checkRes(res)) {
+    let dom = new JSDOM(res.data).window.document;
+    let meta = getMeta(dom);
+    let archive = true;
+    if (meta.robots !== undefined && meta.robots !== null) {
+      if (meta.robots.toLowerCase().includes("noindex") || meta.robots.toLowerCase().includes("none")) {
+        return;
       }
-      if (archive) {
+      archive = meta.robots.toLowerCase().includes("noarchive") || meta.robots.toLowerCase().includes("no archive");
+    }
+    if (archive) {
       let description = (meta.description || meta['og:description'] ||
-          htmlToText.fromString(dom.getElementsByTagName('body')[0].innerHTML, {
-              wordwrap: 5000,
-              preserveNewlines: true
-          }).split("\n")[0]);
+        htmlToText.fromString(dom.getElementsByTagName('body')[0].innerHTML, {
+            wordwrap: 5000,
+            preserveNewlines: true
+        }).split("\n")[0]);
       let title = undefined;
       if (meta['og:title'] !== null && meta['og:title'] !== undefined) {
-          title = meta['og:title'];
+        title = meta['og:title'];
       } else if (res.data.match(regTitle) !== null && res.data.match(regTitle) !== undefined) {
-          title = res.data.match(regTitle)[0].split(">")[1].split("<")[0];
+        title = res.data.match(regTitle)[0].split(">")[1].split("<")[0];
       }
-        if (title !== undefined && description !== undefined) {
-            await writeEntry(url, title, description);
-        } else if (title !== undefined && description === undefined) {
-            await writeInvaildEntry(url, title);
-        }
+      if (title !== undefined && description !== undefined) {
+        await writeEntry(url, title, description);
+      } else if (title !== undefined && description === undefined) {
+        await writeInvaildEntry(url, title);
       }
     }
-  }).catch(async function(err) {
-    console.error("URL: " + url + " failed");
-    models.Url.deleteMany({
-      Url: url
-    }, function(err) {
-      if (err) {
-        throw err;
-      } else {
-        return sleep(500);
-      }
-    });
-  });
+  }
 }
 
 
