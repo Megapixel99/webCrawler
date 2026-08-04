@@ -1,13 +1,13 @@
 {
   "name": "webcrawler",
   "version": "1.0.0",
-  "description": "",
+  "description": "A from-scratch web crawler and search engine in Node.js: cluster-based crawler, hand-written inverted index in MongoDB, and BM25 ranking with no search library.",
   "main": "index.js",
   "scripts": {
     "start": "node ./manager.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Seth Wheeler <23089578+Megapixel99@users.noreply.github.com>",
   "license": "MIT",
   "dependencies": {
     "axios": "^0.19.2",
