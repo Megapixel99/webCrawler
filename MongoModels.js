@@ -41,6 +41,8 @@ const hostSchema = mongoose.Schema({
     unique: true
   },
   robotsTxt: String,
+  robotsCheckedAt: Date,
+  crawlDelay: Number,
   fetchedAt: Date,
   nextAllowedAt: Date,
 });

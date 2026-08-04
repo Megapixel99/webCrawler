@@ -85,8 +85,7 @@ function checkRes(res) {
         return false;
 }
 
-async function findRecords(res, url, claim, pid = 0) {
-  if (!claim) return Promise.resolve();
+async function findRecords(res, url, pid = 0) {
   if (checkRes(res)) {
     let dom = new JSDOM(res.data).window.document;
     let meta = getMeta(dom);

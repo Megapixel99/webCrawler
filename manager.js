@@ -5,9 +5,7 @@ const moment = require('moment');
 const deleteDups = require('./deleteDups.js');
 const models = require('./MongoModels.js');
 let memUsed = 125000000;
-// var max_processes = Math.floor(os.cpus().length * 3.25);
 var max_processes = Math.floor(os.freemem()/memUsed);
-// let max_processes = 1;
 let current_processes = 0;
 let urls = [];
 let initURLs = ["https://moz.com/top500", "https://gist.github.com/demersdesigns/4442cd84c1cc6c5ccda9b19eac1ba52b", "https://ahrefs.com/blog/most-visited-websites/", "https://fossbytes.com/most-useful-websites-internet/"];
@@ -67,7 +65,6 @@ async function masterProcess() {
   console.log(`Manager is running`);
 
   setInterval(function() {
-    // deleteDups();
   }, 2500);
 
   dbconn.connect();
@@ -92,6 +89,12 @@ async function masterProcess() {
 
 async function childProcess() {
     require('./databaseConnect.js').connect();
-    await search(process.env.URL, process.pid);
+    const outcome = await search(process.env.URL, process.pid);
+    if (outcome === search.OUTCOMES.DEFERRED) {
+        console.log("Kept URL: " + process.env.URL + " in queue (" + outcome + ")");
+    } else {
+        await models.Url.deleteMany({ Url: process.env.URL });
+        console.log("Removed URL: " + process.env.URL + " from queue (" + outcome + ")");
+    }
     process.exit(0);
 }

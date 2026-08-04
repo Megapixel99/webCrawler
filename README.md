@@ -54,6 +54,7 @@ library.
 | `manager.js` | Crawl orchestrator — `cluster` master/worker pool, pulls the URL frontier, spawns workers |
 | `index.js` | Per-URL worker: fetch, extract & queue links (robots-meta aware), hand off to `convert` |
 | `convert.js` | Fetch a page, extract text/metadata, store an `Entry`, and update the inverted index |
+| `robots.js` | Hand-written `robots.txt` parser + path matcher (`Disallow`/`Allow`/`Crawl-delay`) |
 | `tokenizer.js` | Shared tokenizer used by **both** indexing and search (must be identical on both sides) |
 | `search.js` | BM25 ranking over the inverted index |
 | `MongoModels.js` | Mongoose schemas (below) |
@@ -67,6 +68,7 @@ library.
 ### Data model
 
 - **`Url`** `{ Url, FoundAt }` — the crawl frontier (URLs waiting to be visited).
+- **`Host`** `{ host (unique), robotsTxt, robotsCheckedAt, crawlDelay, fetchedAt, nextAllowedAt }` — per-host politeness state, shared across cluster workers. `nextAllowedAt` is the rate-limit slot: a worker claims it with an atomic `findOneAndUpdate` before making any request.
 - **`Entry`** `{ Url, Title, Description, Words[], Length, Clicks, FoundAt }` — an indexed page. `Length` is the token count, used by BM25.
 - **`IndexTerm`** `{ term (unique, indexed), df, postings: [{ docId, tf, len }] }` — the **inverted index**: each term maps to the documents that contain it, with per-document term frequency and document length.
 - **`InvalidEntry`** — pages that had a title but no usable description.
@@ -141,8 +143,11 @@ deploying to a remote host.
 
 This is a learning project, and the scope is deliberately bounded:
 
-- **Politeness:** honors `noindex` / `nofollow` / `noarchive` robots *meta* tags,
-  but not `robots.txt` or `Crawl-delay`, and there's no per-host rate limiting.
+- **Politeness:** honors `robots.txt` (`Disallow` / `Allow` / `Crawl-delay`) and
+  `noindex` / `nofollow` / `noarchive` robots *meta* tags, and rate-limits per
+  host. Rules are matched per-path with the usual longest-match-wins precedence,
+  but there is no support for `Sitemap:` directives, and robots.txt is fetched
+  once per host and never re-checked.
 - **Tokenizer:** lowercases, splits on non-alphanumerics, drops empties — but no
   stemming, no stopword removal, and no phrase/positional queries.
 - **Indexed text:** title + description (meta description or the first block of
@@ -154,7 +159,7 @@ This is a learning project, and the scope is deliberately bounded:
 
 ## Possible improvements
 
-- `robots.txt` + `Crawl-delay` + per-host politeness
+- Re-check `robots.txt` periodically instead of caching it forever per host
 - Stemming, stopword filtering, and positional postings for phrase queries
 - Index full body text with field weighting (title vs. body)
 - Incremental re-crawl / freshness

@@ -1,3 +1,5 @@
+
+require('dotenv').config();
 const axios = require('axios');
 const fs = require('fs');
 const process = require('process');
@@ -8,8 +10,22 @@ const {
     JSDOM
 } = require("jsdom");
 const getMeta = require('./meta.js');
+const robots = require('./robots.js');
+
+const USER_AGENT = process.env.CRAWLER_USER_AGENT;
+const MIN_CRAWL_DELAY_MS = Number.parseInt(process.env.MIN_CRAWL_DELAY_MS, 10) || 5000;
+const MAX_CRAWL_DELAY_MS = Number.parseInt(process.env.MAX_CRAWL_DELAY_MS, 10) || 60000;
+const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.REQUEST_TIMEOUT_MS, 10) || 10000;
+
+const OUTCOMES = {
+  CRAWLED: 'crawled',
+  DEFERRED: 'deferred',
+  DISALLOWED: 'disallowed',
+  FAILED: 'failed',
+};
 
 axios.defaults.headers.common['Accept'] = 'text/text,text/html'
+axios.defaults.headers.common['User-Agent'] = USER_AGENT
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,46 +80,96 @@ async function processURL(res, url) {
   }
 }
 
-function nextQueue(url, _pid = 0) {
-  let { host, origin } = new URL(url);
-  const now = new Date();
+function crawlDelayMs(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return MIN_CRAWL_DELAY_MS;
+  return Math.min(Math.max(seconds * 1000, MIN_CRAWL_DELAY_MS), MAX_CRAWL_DELAY_MS);
+}
+
+async function seedHost(host) {
+  try {
+    return await models.Host.findOneAndUpdate(
+      { host },
+      { $setOnInsert: { nextAllowedAt: new Date(0) } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } catch (err) {
+    if (err.code !== 11000) throw err;
+    return models.Host.findOne({ host });
+  }
+}
+
+async function fetchRobots(origin) {
+  try {
+    const res = await axios.get(`${origin}/robots.txt`, {
+      timeout: REQUEST_TIMEOUT_MS,
+      headers: { Accept: 'text/plain,text/*' },
+      validateStatus: (status) => status < 500,
+    });
+    if (res.status >= 400) return '';
+    return typeof res.data === 'string' ? res.data : '';
+  } catch (err) {
+    console.log(`Unable to fetch robots.txt for ${origin}: ${err.message}`);
+    return null;
+  }
+}
+
+async function nextQueue(url, _pid = 0) {
   console.log("URL being processed: " + url);
-  return sleep(1000)
-    .then(async () => {
-      await models.Host.updateOne(
-        { host },
-        { $setOnInsert: { nextAllowedAt: new Date(0) } },
-        { upsert: true }
-      );
-      let claim = await models.Host.findOneAndUpdate(
-        { host, nextAllowedAt: { $lte: now } },
-        { $set: { nextAllowedAt: new Date(now.getTime() + 5000), fetchedAt: now } },
-        { new: true }
-      )
-      if (!claim) return;
-      pid = _pid;
-      if (!claim.robotsTxt) {
-        await axios.get(`${origin}/robots.txt`)
-          .then((res) => res.data)
-          .then((robotsTxt) => models.Host.updateOne(
-            { host },
-            { robotsTxt },
-            { upsert: true }
-          ))
-          .catch((err) => {
-            if (err?.response?.status !== 404) {
-              throw err;
-            }
-          })
+  const { host, origin, pathname, search } = new URL(url);
+  const path = pathname + search;
+  pid = _pid;
+
+  try {
+    await sleep(1000);
+
+    const hostRecord = await seedHost(host);
+    const now = new Date();
+    const claim = await models.Host.findOneAndUpdate(
+      { host, nextAllowedAt: { $lte: now } },
+      {
+        $set: {
+          nextAllowedAt: new Date(now.getTime() + crawlDelayMs(hostRecord.crawlDelay)),
+          fetchedAt: now,
+        },
+      },
+      { new: true }
+    );
+    if (!claim) {
+      console.log(`${url} deferred, ${host} was fetched too recently`);
+      return OUTCOMES.DEFERRED;
+    }
+
+    let parsed;
+    if (claim.robotsCheckedAt) {
+      parsed = robots.parse(claim.robotsTxt, USER_AGENT);
+    } else {
+      const body = await fetchRobots(origin);
+      if (body === null) {
+        return OUTCOMES.DEFERRED;
       }
-      let res = await axios.get(url);
-      await convert(res, url, claim, _pid);
-      await processURL(res, url);
-    })
-    .catch((err) => {
-      console.error("URL: " + url + " failed");
-      return sleep(1000);
-    })
+      parsed = robots.parse(body, USER_AGENT);
+      const update = { robotsTxt: body, robotsCheckedAt: new Date() };
+      if (parsed.crawlDelay !== null) {
+        update.crawlDelay = parsed.crawlDelay;
+        update.nextAllowedAt = new Date(now.getTime() + crawlDelayMs(parsed.crawlDelay));
+      }
+      await models.Host.updateOne({ host }, { $set: update });
+    }
+
+    if (!robots.isAllowed(parsed.rules, path)) {
+      console.log(`${url} is disallowed by robots.txt`);
+      return OUTCOMES.DISALLOWED;
+    }
+
+    const res = await axios.get(url, { timeout: REQUEST_TIMEOUT_MS });
+    await convert(res, url, _pid);
+    await processURL(res, url);
+    return OUTCOMES.CRAWLED;
+  } catch (err) {
+    console.error(`URL: ${url} failed: ${err.message}`);
+    return OUTCOMES.FAILED;
+  }
 }
 
 module.exports = nextQueue;
+module.exports.OUTCOMES = OUTCOMES;
