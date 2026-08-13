@@ -1,5 +1,7 @@
 # webCrawler
 
+[![test](https://github.com/Megapixel99/webCrawler/actions/workflows/test.yml/badge.svg)](https://github.com/Megapixel99/webCrawler/actions/workflows/test.yml)
+
 A small **web crawler and search engine**, written from scratch in Node.js to
 learn how crawling, indexing, and relevance ranking actually work under the
 hood. It crawls the open web, builds a **hand-written inverted index** in
@@ -126,6 +128,29 @@ Then open **http://localhost:3000** and search.
 > **Configuration note:** `databaseConnect.js` should read the connection
 > string from `process.env.MONGO_URI`. Do **not** commit real credentials to the
 > repo.
+
+### Tests
+
+```bash
+npm test
+```
+
+`test/robots.test.js` covers the `robots.txt` parser and path matcher — no
+database or network needed.
+
+`test/politeness.test.js` is an integration suite: it runs local HTTP servers
+standing in for crawled hosts and asserts on **what those servers actually
+received**, since a rate limiter that reports "deferred" while still sending the
+request is as rude as no rate limiter at all. It covers `Disallow` enforcement,
+robots.txt caching, `Crawl-delay`, failing closed on an unreachable robots.txt,
+and the atomic claim under six concurrent workers.
+
+It needs a MongoDB instance and skips itself when none is reachable, so
+`npm test` works without one. Point it somewhere specific with:
+
+```bash
+TEST_MONGO_URI=mongodb://127.0.0.1:27017/webcrawler_integration_test npm test
+```
 
 ### Docker
 

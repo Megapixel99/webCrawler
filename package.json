@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node ./manager.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/robots.test.js && node test/politeness.test.js",
+    "test:robots": "node test/robots.test.js",
+    "test:politeness": "node test/politeness.test.js"
   },
   "author": "Seth Wheeler <23089578+Megapixel99@users.noreply.github.com>",
   "license": "MIT",
