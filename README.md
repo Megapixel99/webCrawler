@@ -12,6 +12,11 @@ library.
 > engine by implementing each one myself, not to compete with a production
 > engine. See [Limitations](#limitations).
 
+**Write-up:** [Rate Limiting a Crawler Across Node Cluster
+Workers](https://sethwheeler.dev/blog/crawler-rate-limiter/) — the politeness
+limiter took three attempts, and the first two enforced a perfectly correct
+delay while the crawled host received a hundred simultaneous requests.
+
 ---
 
 ## How it works
