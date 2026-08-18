@@ -1,0 +1,13 @@
+{
+  "name": "bottleneck-cluster-harness",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Does Bottleneck's rate limit hold across Node cluster workers? Measured from the server's side.",
+  "scripts": {
+    "control": "node harness.js --workers 1 --datastore local --min-time 500 --reqs 6",
+    "test": "node harness.js --workers 6 --datastore local --min-time 500 --reqs 6",
+    "redis": "node harness.js --workers 6 --datastore ioredis --min-time 500 --reqs 6"
+  },
+  "dependencies": { "bottleneck": "^2.19.5", "ioredis": "^5.4.1" },
+  "license": "MIT"
+}
